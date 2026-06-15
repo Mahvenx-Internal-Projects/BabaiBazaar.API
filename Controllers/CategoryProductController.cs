@@ -632,4 +632,23 @@ public class PincodeController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(new { message = "Pincode removed" });
     }
+    [HttpPut("pincodes/{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> Update(int id, [FromBody] CreatePincodeRequest req)
+    {
+        var p = await _db.Pincodes.FindAsync(id);
+
+        if (p == null)
+            return NotFound(new { message = "Pincode not found" });
+
+        p.Pincode_ = req.Pincode;
+        p.Area = req.Area ?? "";
+        p.City = req.City;
+        p.State = req.State;
+        p.DeliveryEta = req.DeliveryEta;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(p);
+    }
 }
