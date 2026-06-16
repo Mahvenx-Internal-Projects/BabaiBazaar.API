@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BabaiBazaar.API.Models;
 
+
 // ── BASE ──────────────────────────────────────────────────────
 public abstract class BaseEntity
 {
