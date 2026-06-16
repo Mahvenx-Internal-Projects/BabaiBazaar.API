@@ -307,3 +307,4 @@ public class Pincode : BaseEntity
     [MaxLength(100)] public string State       { get; set; } = "Telangana";
     public int DeliveryEta { get; set; } = 20; // minutes
 }
+//babai_Bazaar
