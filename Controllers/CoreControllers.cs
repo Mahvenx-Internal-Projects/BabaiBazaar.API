@@ -272,6 +272,34 @@ public class DeliveryBoyController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(new { message = "Approved", deliveryBoy = d });
     }
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> Update(
+    int id,
+    [FromBody] UpdateDeliveryBoyRequest req)
+    {
+        var d = await _db.DeliveryBoys.FindAsync(id);
+
+        if (d == null)
+            return NotFound(new
+            {
+                message = "Delivery boy not found"
+            });
+
+        d.Name = req.Name.Trim();
+        d.Phone = req.Phone.Trim();
+        d.AadhaarNumber = req.AadhaarNumber.Trim();
+        d.VehicleType = req.VehicleType;
+        d.VehicleNumber = req.VehicleNumber;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Delivery boy updated successfully",
+            deliveryBoy = d
+        });
+    }
 
     [HttpPut("{id}/toggle-online"), Authorize]
     public async Task<IActionResult> ToggleOnline(int id)
@@ -293,6 +321,29 @@ public class DeliveryBoyController : ControllerBase
         _db.DeliveryBoyPayouts.Add(new DeliveryBoyPayout { DeliveryBoyId = id, Amount = req.Amount, Status = "PROCESSED", ProcessedAt = DateTime.UtcNow });
         await _db.SaveChangesAsync();
         return Ok(new { message = "Payout processed", amount = req.Amount });
+    }
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var d = await _db.DeliveryBoys.FindAsync(id);
+
+        if (d == null)
+        {
+            return NotFound(new
+            {
+                message = "Delivery boy not found"
+            });
+        }
+
+        _db.DeliveryBoys.Remove(d);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Delivery boy deleted successfully"
+        });
     }
 }
 
@@ -649,6 +700,45 @@ public class AdminController : ControllerBase
     // PUT /api/users/{id}/unblock
     [HttpPut("/api/users/{id}/unblock"), Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> UnblockUser(int id) { var u = await _db.User.FindAsync(id); if (u==null) return NotFound(); u.IsActive=true; await _db.SaveChangesAsync(); return Ok(new { message="User unblocked" }); }
+    // PUT /api/admin/users/{id}
+    [HttpPut("users/{id}"), Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> UpdateAdmin(int id, [FromBody] CreateAdminRequest req)
+    {
+        var admin = await _db.AdminUsers
+            .Include(a => a.User)
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (admin == null)
+            return NotFound();
+
+        admin.Role = req.Role;
+        admin.IsSuperAdmin = req.Role == "SuperAdmin";
+
+        admin.User.Name = req.Name;
+        admin.User.Email = req.Email;
+        admin.User.Role = req.Role;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(admin);
+    }
+    // DELETE /api/admin/users/{id}
+    [HttpDelete("users/{id}"), Authorize(Roles = "SuperAdmin")]
+    public async Task<IActionResult> DeleteAdmin(int id)
+    {
+        var admin = await _db.AdminUsers
+            .Include(a => a.User)
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (admin == null)
+            return NotFound();
+
+        _db.AdminUsers.Remove(admin);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Admin deleted" });
+    }
 }
 
 // ════════════════════════════════════════════════════════════════

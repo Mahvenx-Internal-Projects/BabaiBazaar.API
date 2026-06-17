@@ -111,7 +111,8 @@ public class DeliveryBoy : BaseEntity
     [MaxLength(20)]  public string  Status        { get; set; } = "PENDING"; // PENDING|ACTIVE|INACTIVE|SUSPENDED
     [MaxLength(30)]  public string  VehicleType   { get; set; } = "Bike";
     [MaxLength(20)]  public string? VehicleNumber { get; set; }
-    [MaxLength(20)]  public string? AadhaarNumber { get; set; }
+    [Required]
+    [MaxLength(12)]  public string? AadhaarNumber { get; set; }
     public bool   IsOnline       { get; set; } = false;
     [Column(TypeName="decimal(3,2)")] public decimal Rating     { get; set; } = 0;
     public int    TotalDeliveries { get; set; } = 0;
