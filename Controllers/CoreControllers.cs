@@ -107,21 +107,83 @@ public class VendorController : ControllerBase
     [HttpPost("my/users"), Authorize(Roles = "Vendor,Admin,SuperAdmin")]
     public async Task<IActionResult> MapUser([FromBody] MapUserRequest req)
     {
-        var mapping = await _db.VendorUserMappings.FirstOrDefaultAsync(m => m.UserId == Uid);
-        if (mapping == null && !User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        Console.WriteLine($"VendorId = {req.VendorId}");
+        Console.WriteLine($"Phone = {req.Phone}");
+        Console.WriteLine($"Role = {req.Role}");
+        var mapping = await _db.VendorUserMappings
+            .FirstOrDefaultAsync(m => m.UserId == Uid);
+
+        if (mapping == null &&
+            !User.IsInRole("Admin") &&
+            !User.IsInRole("SuperAdmin"))
+        {
             return Forbid();
+        }
 
-        var vendorId = mapping?.VendorId ?? 0;
-        var user = await _db.User.FirstOrDefaultAsync(u => u.Phone == req.Phone.Replace("+91","").Trim());
-        if (user == null) return NotFound(new { message = "User not found. They must register on the app first." });
+        int vendorId;
 
-        var exists = await _db.VendorUserMappings.AnyAsync(m => m.VendorId == vendorId && m.UserId == user.Id);
-        if (exists) return Conflict(new { message = "User already mapped to this vendor" });
+        if (User.IsInRole("Admin") || User.IsInRole("SuperAdmin"))
+        {
+            vendorId = req.VendorId;
+        }
+        else
+        {
+            vendorId = mapping!.VendorId;
+        }
+
+        var user = await _db.User
+            .FirstOrDefaultAsync(u =>
+                u.Phone == req.Phone.Replace("+91", "").Trim());
+
+        if (user == null)
+        {
+            return NotFound(new
+            {
+                message = "User not found. They must register on the app first."
+            });
+        }
+
+        var vendor = await _db.Vendors.FindAsync(vendorId);
+
+        if (vendor == null)
+        {
+            return NotFound(new
+            {
+                message = "Vendor not found"
+            });
+        }
+
+        var exists = await _db.VendorUserMappings
+            .AnyAsync(m =>
+                m.VendorId == vendorId &&
+                m.UserId == user.Id);
+
+        if (exists)
+        {
+            return Conflict(new
+            {
+                message = "User already mapped to this vendor"
+            });
+        }
 
         user.Role = "Vendor";
-        _db.VendorUserMappings.Add(new VendorUserMapping { VendorId = vendorId, UserId = user.Id, Role = req.Role });
+
+        _db.VendorUserMappings.Add(new VendorUserMapping
+        {
+            VendorId = vendorId,
+            UserId = user.Id,
+            Role = req.Role
+        });
+
         await _db.SaveChangesAsync();
-        return Ok(new { message = "User mapped as vendor team member", userId = user.Id, role = req.Role });
+
+        return Ok(new
+        {
+            message = "User mapped as vendor team member",
+            vendorId,
+            userId = user.Id,
+            role = req.Role
+        });
     }
 
     [HttpDelete("my/users/{userId}"), Authorize(Roles = "Vendor,Admin,SuperAdmin")]
@@ -159,6 +221,27 @@ public class VendorController : ControllerBase
     {
         // Store bank details (in production encrypt these)
         return Ok(new { message = "Bank details saved. Payouts will be processed every Monday." });
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        Console.WriteLine($"DELETE HIT: {id}");
+
+        var vendor = await _db.Vendors.FindAsync(id);
+
+        if (vendor == null)
+            return NotFound();
+
+        _db.Vendors.Remove(vendor);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Vendor deleted successfully"
+        });
     }
 }
 
@@ -442,6 +525,63 @@ public class ServicePersonController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(new { message = "Payout processed", amount = req.Amount });
     }
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(
+    int id,
+    [FromBody] RegisterServicePersonRequest req)
+    {
+        var sp = await _db.ServicePersons.FindAsync(id);
+
+        if (sp == null)
+            return NotFound();
+
+        sp.Name = req.Name;
+        sp.Phone = req.Phone;
+        sp.Email = req.Email;
+        sp.Bio = req.Bio;
+        sp.SkillTags = req.Skills;
+        sp.Experience = req.Experience;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Service person updated",
+            servicePerson = sp
+        });
+    }
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var sp = await _db.ServicePersons.FindAsync(id);
+
+        if (sp == null)
+            return NotFound();
+
+        _db.ServicePersons.Remove(sp);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Service person deleted"
+        });
+    }
+    [HttpPut("{id}/reject")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> Reject(int id)
+    {
+        var sp = await _db.ServicePersons.FindAsync(id);
+
+        if (sp == null)
+            return NotFound();
+
+        sp.Status = "INACTIVE"; // or "REJECTED"
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Service person rejected" });
+    }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -700,6 +840,24 @@ public class AdminController : ControllerBase
     // PUT /api/users/{id}/unblock
     [HttpPut("/api/users/{id}/unblock"), Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> UnblockUser(int id) { var u = await _db.User.FindAsync(id); if (u==null) return NotFound(); u.IsActive=true; await _db.SaveChangesAsync(); return Ok(new { message="User unblocked" }); }
+    [HttpDelete("/api/users/{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> DeleteUser(int id)
+    {
+        var user = await _db.User.FindAsync(id);
+
+        if (user == null)
+            return NotFound();
+
+        _db.User.Remove(user);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "User deleted successfully"
+        });
+    }
     // PUT /api/admin/users/{id}
     [HttpPut("users/{id}"), Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> UpdateAdmin(int id, [FromBody] CreateAdminRequest req)

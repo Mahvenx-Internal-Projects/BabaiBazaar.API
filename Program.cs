@@ -97,10 +97,12 @@ builder.Services.AddControllers()
 
 builder.Services.AddScoped<JwtHelper>();
 builder.Services.AddScoped<UploadHelper>();
+builder.Services.AddScoped<ICloudflareService, CloudflareService>();
 builder.Services.AddMemoryCache();
 
 // ── APP BUILD ─────────────────────────────────────────────────
 var app = builder.Build();
+
 
 // ── SEED DATABASE ─────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())

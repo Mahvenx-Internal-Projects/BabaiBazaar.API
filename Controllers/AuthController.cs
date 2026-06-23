@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using BabaiBazaar.API.Data;
 using BabaiBazaar.API.DTOs;
@@ -28,8 +29,21 @@ public class AuthController : ControllerBase
     [HttpPost("send-otp")]
     public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest req)
     {
+        if (req == null || string.IsNullOrWhiteSpace(req.Phone))
+        {
+            return BadRequest(new { message = "Phone number is required" });
+        }
+
         var phone = req.Phone.Replace("+91", "").Trim();
-        if (phone.Length < 10) return BadRequest(new { message = "Invalid phone number" });
+
+        // Validate Indian mobile number
+        if (!Regex.IsMatch(phone, @"^[6-9]\d{9}$"))
+        {
+            return BadRequest(new
+            {
+                message = "Please enter a valid 10-digit mobile number"
+            });
+        }
 
         var otp = _cfg["AppSettings:DevMode"] == "true"
             ? "1234"
@@ -37,17 +51,17 @@ public class AuthController : ControllerBase
 
         _db.OtpRecords.Add(new OtpRecord
         {
-            Phone     = phone,
-            Code      = otp,
+            Phone = phone,
+            Code = otp,
             ExpiresAt = DateTime.UtcNow.AddMinutes(10)
         });
+
         await _db.SaveChangesAsync();
 
-        // TODO: wire Twilio SMS here
         return Ok(new
         {
             message = "OTP sent successfully",
-            otp = _cfg["AppSettings:DevMode"] == "true" ? otp : (string?)null
+            otp = _cfg["AppSettings:DevMode"] == "true" ? otp : null
         });
     }
 

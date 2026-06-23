@@ -88,7 +88,11 @@ public record UpdateVendorRequest(
     string? OperatingFrom, string? OperatingTo, string? LogoUrl,
     string? OwnerName, string? OwnerPhone, string? Email, string? Description);
 
-public record MapUserRequest([Required] string Phone, string Role = "Manager");
+public record MapUserRequest(
+    int VendorId,
+    [Required] string Phone,
+    string Role = "Manager"
+);
 
 public record VendorBankRequest(
     string? AccountHolderName, string? AccountNumber, string? IfscCode,
@@ -123,7 +127,7 @@ public record UpdateDeliveryBoyRequest(
 // ── SERVICE PERSON ────────────────────────────────────────────
 public record RegisterServicePersonRequest(
     [Required] string Name, [Required] string Phone,
-    string? Email = null, string? Bio = null, string? Skills = null, string? Experience = null);
+    [Required]string Email = null, string? Bio = null, string? Skills = null, string? Experience = null);
 
 public record SetPaymentConfigRequest(
     [Required] string PaymentType, decimal RateAmount = 0);
