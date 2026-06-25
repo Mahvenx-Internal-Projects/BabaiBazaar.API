@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 using BabaiBazaar.API.Data;
 using BabaiBazaar.API.DTOs;
 using BabaiBazaar.API.Helpers;
@@ -403,7 +404,6 @@ public class CartController : ControllerBase
 
 // ════════════════════════════════════════════════════════════════
 // ORDERS
-// ════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/orders")]
 [Tags("Cart & Orders")]
@@ -563,7 +563,15 @@ public class BannersController : ControllerBase
 public class UploadController : ControllerBase
 {
     private readonly UploadHelper _upload;
-    public UploadController(UploadHelper upload) => _upload = upload;
+    private readonly ICloudflareService _cloudflare;
+
+    public UploadController(
+        UploadHelper upload,
+        ICloudflareService cloudflare)
+    {
+        _upload = upload;
+        _cloudflare = cloudflare;
+    }
 
     // POST /api/upload/image?folder=products
     [HttpPost("image"), Authorize]
@@ -575,7 +583,12 @@ public class UploadController : ControllerBase
         var ext = Path.GetExtension(file.FileName).ToLower();
         if (!allowed.Contains(ext)) return BadRequest(new { message = "Only image files allowed" });
 
-        var url = await _upload.SaveLocalAsync(file, folder);
+        var result = await _cloudflare.UploadImageAsync(file, folder);
+
+        if (!result.Success)
+            return BadRequest(new { message = result.Error });
+
+        var url = result.Url;
         return Ok(new { url, imageUrl = url, filePath = url, message = "Uploaded" });
     }
 
@@ -585,7 +598,12 @@ public class UploadController : ControllerBase
     public async Task<IActionResult> Document(IFormFile file, [FromQuery] string folder = "documents")
     {
         if (file == null || file.Length == 0) return BadRequest(new { message = "No file uploaded" });
-        var url = await _upload.SaveLocalAsync(file, folder);
+        var result = await _cloudflare.UploadFileAsync(file, folder);
+
+        if (!result.Success)
+            return BadRequest(new { message = result.Error });
+
+        var url = result.Url;
         return Ok(new { url, message = "Document uploaded" });
     }
 }
@@ -615,11 +633,42 @@ public class PincodeController : ControllerBase
     [HttpPost("pincodes"), Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> Create([FromBody] CreatePincodeRequest req)
     {
-        if (await _db.Pincodes.AnyAsync(p => p.Pincode_ == req.Pincode))
-            return Conflict(new { message = "Pincode already exists" });
-        var p = new Pincode { Pincode_ = req.Pincode, Area = req.Area ?? "", City = req.City, State = req.State, DeliveryEta = req.DeliveryEta };
+        if (string.IsNullOrWhiteSpace(req.Pincode))
+        {
+            return BadRequest(new
+            {
+                message = "Pincode is required"
+            });
+        }
+
+        if (!req.Pincode.All(char.IsDigit))
+        {
+            return BadRequest(new
+            {
+                message = "Pincode must contain only digits"
+            });
+        }
+
+        if (req.Pincode.Length != 6)
+        {
+            return BadRequest(new
+            {
+                message = "Pincode must be exactly 6 digits"
+            });
+        }
+
+        var p = new Pincode
+        {
+            Pincode_ = req.Pincode,
+            Area = req.Area ?? "",
+            City = req.City,
+            State = req.State,
+            DeliveryEta = req.DeliveryEta
+        };
+
         _db.Pincodes.Add(p);
         await _db.SaveChangesAsync();
+
         return Ok(p);
     }
 
@@ -631,5 +680,46 @@ public class PincodeController : ControllerBase
         p.IsActive = false;
         await _db.SaveChangesAsync();
         return Ok(new { message = "Pincode removed" });
+    }
+    [HttpPut("pincodes/{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> Update(int id, [FromBody] CreatePincodeRequest req)
+    {
+        if (!Regex.IsMatch(req.Pincode, @"^\d{6}$"))
+        {
+            return BadRequest(new
+            {
+                message = "Pincode must be exactly 6 digits"
+            });
+        }
+
+        var p = await _db.Pincodes.FindAsync(id);
+
+        if (p == null)
+        {
+            return NotFound(new
+            {
+                message = "Pincode not found"
+            });
+        }
+
+        // Prevent updating to an already existing pincode
+        if (await _db.Pincodes.AnyAsync(x => x.Id != id && x.Pincode_ == req.Pincode))
+        {
+            return Conflict(new
+            {
+                message = "Pincode already exists"
+            });
+        }
+
+        p.Pincode_ = req.Pincode;
+        p.Area = req.Area ?? "";
+        p.City = req.City;
+        p.State = req.State;
+        p.DeliveryEta = req.DeliveryEta;
+
+        await _db.SaveChangesAsync();
+
+        return Ok(p);
     }
 }

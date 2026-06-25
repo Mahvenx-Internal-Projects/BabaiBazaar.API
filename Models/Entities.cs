@@ -58,7 +58,7 @@ public class Address : BaseEntity
     [Column(TypeName="decimal(9,6)")] public decimal? Latitude  { get; set; }
     [Column(TypeName="decimal(9,6)")] public decimal? Longitude { get; set; }
     public bool   IsDefault   { get; set; } = false;
-    public User   User        { get; set; } = null!;
+    public User User { get; set; } = null!;
 }
 
 // ── CATEGORY ──────────────────────────────────────────────────

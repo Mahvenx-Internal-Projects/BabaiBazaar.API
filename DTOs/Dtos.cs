@@ -88,7 +88,11 @@ public record UpdateVendorRequest(
     string? OperatingFrom, string? OperatingTo, string? LogoUrl,
     string? OwnerName, string? OwnerPhone, string? Email, string? Description);
 
-public record MapUserRequest([Required] string Phone, string Role = "Manager");
+public record MapUserRequest(
+    int VendorId,
+    [Required] string Phone,
+    string Role = "Manager"
+);
 
 public record VendorBankRequest(
     string? AccountHolderName, string? AccountNumber, string? IfscCode,
@@ -96,15 +100,34 @@ public record VendorBankRequest(
 
 // ── DELIVERY BOY ──────────────────────────────────────────────
 public record RegisterDeliveryBoyRequest(
-    [Required] string Name, [Required] string Phone,
-    string VehicleType = "Bike", string? VehicleNumber = null, string? AadhaarNumber = null);
+    [Required(ErrorMessage = "Name is required")]
+    string Name,
 
-public record UpdateDeliveryBoyRequest(bool? IsOnline = null, string? Status = null);
+    [Required(ErrorMessage = "Phone is required")]
+    string Phone,
+
+    [Required(ErrorMessage = "Aadhaar Number is required")]
+    [RegularExpression(@"^\d{12}$",
+        ErrorMessage = "Aadhaar Number must be exactly 12 digits")]
+    string AadhaarNumber,
+
+    string VehicleType = "Bike",
+
+    string? VehicleNumber = null
+);
+
+public record UpdateDeliveryBoyRequest(
+    [Required] string Name,
+    [Required] string Phone,
+    [Required] string AadhaarNumber,
+    string VehicleType = "Bike",
+    string? VehicleNumber = null
+);
 
 // ── SERVICE PERSON ────────────────────────────────────────────
 public record RegisterServicePersonRequest(
     [Required] string Name, [Required] string Phone,
-    string? Email = null, string? Bio = null, string? Skills = null, string? Experience = null);
+    [Required]string Email = null, string? Bio = null, string? Skills = null, string? Experience = null);
 
 public record SetPaymentConfigRequest(
     [Required] string PaymentType, decimal RateAmount = 0);

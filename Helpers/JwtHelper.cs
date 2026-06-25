@@ -77,14 +77,25 @@ public class UploadHelper
 
     public async Task<string> SaveLocalAsync(IFormFile file, string folder)
     {
+        Console.WriteLine($"WebRootPath = {_env.WebRootPath}");
+
         var uploads = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", folder);
+
+        Console.WriteLine($"Uploads Folder = {uploads}");
+
         Directory.CreateDirectory(uploads);
-        var ext  = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         var name = $"{Guid.NewGuid()}{ext}";
         var path = Path.Combine(uploads, name);
+
+        Console.WriteLine($"Saving File = {path}");
+
         await using var fs = File.Create(path);
         await file.CopyToAsync(fs);
+
         var baseUrl = _cfg["AppSettings:BaseUrl"] ?? "";
+
         return $"{baseUrl}/uploads/{folder}/{name}";
     }
 
