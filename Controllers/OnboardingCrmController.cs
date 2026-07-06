@@ -1,9 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using BabaiBazaar.API.Data;
 using BabaiBazaar.API.DTOs;
 using BabaiBazaar.API.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Net;
 
 namespace BabaiBazaar.API.Controllers;
 
@@ -426,40 +427,91 @@ public class AddressesController : ControllerBase
     public AddressesController(AppDbContext db) => _db = db;
     private int Uid => int.Parse(User.FindFirst("uid")?.Value ?? "0");
 
-    [HttpGet, Authorize]
-    public async Task<IActionResult> List() => Ok(await _db.Addresses.Where(a => a.UserId == Uid && a.IsActive).OrderByDescending(a => a.IsDefault).ToListAsync());
-
-    [HttpPost, Authorize]
-    public async Task<IActionResult> Add([FromBody] Address req)
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(int id)
     {
-        req.UserId = Uid;
-        if (req.IsDefault)
+        var address = await _db.Addresses
+            .FirstOrDefaultAsync(a => a.Id == id && 
+                                      a.IsActive);
+
+        if (address == null)
+            return NotFound(new { message = "Address not found." });
+
+        return Ok(address);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Add([FromBody] CreateAddressRequest createAddressRequest)
+    {
+        if (createAddressRequest.IsDefault)
         {
-            var existing = await _db.Addresses.Where(a => a.UserId == Uid && a.IsDefault).ToListAsync();
+            var existing = await _db.Addresses
+                .Where(a => a.UserId == Uid && a.IsDefault)
+                .ToListAsync();
+
             existing.ForEach(a => a.IsDefault = false);
         }
-        _db.Addresses.Add(req);
-        await _db.SaveChangesAsync();
-        return Ok(req);
-    }
 
-    [HttpPut("{id}"), Authorize]
-    public async Task<IActionResult> Update(int id, [FromBody] Address req)
+        var address = new Address
+        {
+            UserId = createAddressRequest.UserId,
+            Type = createAddressRequest.Type,
+            Label = createAddressRequest.Label,
+            FullAddress = createAddressRequest.FullAddress,
+            Area = createAddressRequest.Area,
+            City = createAddressRequest.City,
+            Pincode = createAddressRequest.Pincode,
+            Latitude = createAddressRequest.Latitude,
+            Longitude = createAddressRequest.Longitude,
+            IsDefault = createAddressRequest.IsDefault,
+            IsActive = createAddressRequest.IsActive,
+            SortOrder = createAddressRequest.SortOrder
+        };
+
+        _db.Addresses.Add(address);
+        await _db.SaveChangesAsync();
+
+        return Ok(address);
+    }
+            
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] CreateAddressRequest updateRequest)
     {
-        var addr = await _db.Addresses.FirstOrDefaultAsync(a => a.Id == id && a.UserId == Uid);
-        if (addr == null) return NotFound();
-        addr.Label=req.Label; addr.FullAddress=req.FullAddress; addr.Area=req.Area; addr.City=req.City; addr.Pincode=req.Pincode; addr.Type=req.Type; addr.IsDefault=req.IsDefault;
+        var address = await _db.Addresses.FirstOrDefaultAsync(a => a.Id == id && a.UserId == Uid);
+        if (address == null) return NotFound("Address not found.");
+        if (updateRequest.IsDefault)
+        {
+            var existingDefaults = await _db.Addresses
+                .Where(a => a.UserId == updateRequest.UserId && a.IsDefault && a.Id != id)
+                .ToListAsync();
+
+            existingDefaults.ForEach(a => a.IsDefault = false);
+        }
+        address.UserId = updateRequest.UserId;
+        address.Type = updateRequest.Type;
+        address.Label = updateRequest.Label;
+        address.FullAddress = updateRequest.FullAddress;
+        address.Area = updateRequest.Area;
+        address.City = updateRequest.City;
+        address.Pincode = updateRequest.Pincode;
+        address.Latitude = updateRequest.Latitude;
+        address.Longitude = updateRequest.Longitude;
+        address.IsDefault = updateRequest.IsDefault;
+        address.IsActive = updateRequest.IsActive;
+        address.SortOrder = updateRequest.SortOrder;
         await _db.SaveChangesAsync();
-        return Ok(addr);
+        return Ok(address);
     }
 
-    [HttpDelete("{id}"), Authorize]
+    [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var addr = await _db.Addresses.FirstOrDefaultAsync(a => a.Id == id && a.UserId == Uid);
-        if (addr == null) return NotFound();
+        if (addr == null) return NotFound("Address not found.");
         addr.IsActive = false;
         await _db.SaveChangesAsync();
-        return Ok(new { message = "Address removed" });
+        return Ok(new { message = "Address Deleted Sucessfully." });
     }
 }
+ 
