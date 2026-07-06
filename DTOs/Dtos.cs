@@ -219,3 +219,33 @@ public record SendNotificationRequest(
     string? Topic = null, string? UserId = null);
 
 public record ProcessPayoutRequest([Required] string EntityType, [Required] int EntityId);
+
+//── ADDRESS ─────────────────────────────────────
+public record CreateAddressRequest(
+    [Required] string Type,
+    string? Label,
+    [Required] string FullAddress,
+    string? Area,
+    [Required] string City,
+    [Required] string Pincode,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    bool IsDefault = false,
+    bool IsActive = true,
+    int SortOrder = 0,
+    int UserId=0
+);
+public record UpdateAddressRequest(
+      [Required] string Type,
+    string? Label,
+    [Required] string FullAddress,
+    string? Area,
+    [Required] string City,
+    [Required] string Pincode,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    bool IsDefault = false,
+    bool IsActive = true,
+    int SortOrder = 0,
+    int UserId = 0
+    );
